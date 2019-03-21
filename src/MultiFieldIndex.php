@@ -23,9 +23,23 @@ final class MultiFieldIndex implements Index
      */
     private $unique;
 
+    /**
+     * @var string|null
+     */
+    private $name;
+
     public static function forFields(array $fieldNames, bool $unique = false): self
     {
         return self::fromArray([
+            'fields' => $fieldNames,
+            'unique' => $unique,
+        ]);
+    }
+
+    public static function namedIndexForFields(string $idxName, array $fieldNames, bool $unique = false): self
+    {
+        return self::fromArray([
+            'name' => $idxName,
             'fields' => $fieldNames,
             'unique' => $unique,
         ]);
@@ -39,11 +53,12 @@ final class MultiFieldIndex implements Index
 
         return new self(
             $data['unique'] ?? false,
+            $data['name'] ?? null,
             ...$fields
         );
     }
 
-    private function __construct(bool $unique, FieldIndex ...$fields)
+    private function __construct(bool $unique,string $name = null, FieldIndex ...$fields)
     {
         if (\count($fields) <= 1) {
             throw new \InvalidArgumentException('MultiFieldIndex should contain at least two fields');
@@ -51,6 +66,7 @@ final class MultiFieldIndex implements Index
 
         $this->fields = $fields;
         $this->unique = $unique;
+        $this->name = $name;
     }
 
     /**
@@ -69,6 +85,11 @@ final class MultiFieldIndex implements Index
         return $this->unique;
     }
 
+    public function name(): ?string
+    {
+        return $this->name;
+    }
+
     public function toArray(): array
     {
         return [
@@ -76,6 +97,7 @@ final class MultiFieldIndex implements Index
                 return $field->field();
             }, $this->fields),
             'unique' => $this->unique,
+            'name' => $this->name,
         ];
     }
 

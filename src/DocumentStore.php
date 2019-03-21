@@ -38,6 +38,7 @@ interface DocumentStore
     /**
      * @param string $collectionName
      * @param Index[] ...$indices
+     * @throws RuntimeException if adding did not succeed
      */
     public function addCollection(string $collectionName, Index ...$indices): void;
 
@@ -46,6 +47,22 @@ interface DocumentStore
      * @throws RuntimeException if dropping did not succeed
      */
     public function dropCollection(string $collectionName): void;
+
+    public function hasCollectionIndex(string $collectionName, string $indexName): bool;
+
+    /**
+     * @param string $collectionName
+     * @param Index $index
+     * @throws RuntimeException if adding did not succeed
+     */
+    public function addCollectionIndex(string $collectionName, Index $index): void;
+
+    /**
+     * @param string $collectionName
+     * @param string $indexName
+     * @throws RuntimeException if dropping did not succeed
+     */
+    public function dropCollectionIndex(string $collectionName, string $indexName): void;
 
     /**
      * @param string $collectionName

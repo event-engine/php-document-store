@@ -28,6 +28,11 @@ final class FieldIndex implements Index
      */
     private $sort;
 
+    /**
+     * @var string|null
+     */
+    private $name;
+
     public static function forFieldInMultiFieldIndex(string $field): self
     {
         return self::forField($field);
@@ -38,19 +43,26 @@ final class FieldIndex implements Index
         return new self($field, $sort, $unique);
     }
 
+    public static function namedIndexForField(string $idxName, string $field, int $sort = self::SORT_ASC, bool $unique = false): self
+    {
+        return new self($field, $sort, $unique, $idxName);
+    }
+
     public static function fromArray(array $data): Index
     {
         return new self(
             $data['field'] ?? '',
             $data['sort'] ?? self::SORT_ASC,
-            $data['unique'] ?? false
+            $data['unique'] ?? false,
+            $data['name'] ?? null
         );
     }
 
     private function __construct(
         string $field,
         int $sort,
-        bool $unique
+        bool $unique,
+        string $name = null
     ) {
         if (\mb_strlen($field) === 0) {
             throw new \InvalidArgumentException('Field must not be empty');
@@ -63,6 +75,7 @@ final class FieldIndex implements Index
         $this->field = $field;
         $this->sort = $sort;
         $this->unique = $unique;
+        $this->name = $name;
     }
 
     /**
@@ -89,12 +102,18 @@ final class FieldIndex implements Index
         return $this->unique;
     }
 
+    public function name(): ?string
+    {
+        return $this->name;
+    }
+
     public function toArray(): array
     {
         return [
             'field' => $this->field,
             'sort' => $this->sort,
             'unique' => $this->unique,
+            'name' => $this->name,
         ];
     }
 
