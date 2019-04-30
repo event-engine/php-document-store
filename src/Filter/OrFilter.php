@@ -17,10 +17,15 @@ final class OrFilter implements Filter
 
     private $bFilter;
 
-    public function __construct(Filter $aFilter, Filter $bFilter)
+    public function __construct(Filter $aFilter, Filter $bFilter, Filter ...$filters)
     {
         $this->aFilter = $aFilter;
-        $this->bFilter = $bFilter;
+
+        if(count($filters)) {
+            $this->bFilter = new self($bFilter, ...$filters);
+        } else {
+            $this->bFilter = $bFilter;
+        }
     }
 
     /**
