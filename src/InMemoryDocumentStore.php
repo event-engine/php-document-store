@@ -99,10 +99,10 @@ final class InMemoryDocumentStore implements DocumentStore
 
     /**
      * @param string $collectionName
-     * @param string $indexName
+     * @param string|Index $index
      * @throws RuntimeException if dropping did not succeed
      */
-    public function dropCollectionIndex(string $collectionName, string $indexName): void
+    public function dropCollectionIndex(string $collectionName, $index): void
     {
         //InMemoryDocumentStore ignores indices
     }
