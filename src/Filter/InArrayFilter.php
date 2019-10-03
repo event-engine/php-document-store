@@ -59,6 +59,15 @@ final class InArrayFilter implements Filter
             return false;
         }
 
-        return \in_array($this->val, $prop);
+        foreach ($prop as $item) {
+            if (! is_array($item) && $item === $this->val) {
+                return true;
+            }
+
+            if (is_array($item) && array_intersect_assoc($this->val, $item) !== []) {
+                return true;
+            }
+        }
+        return false;
     }
 }
