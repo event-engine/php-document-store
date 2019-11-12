@@ -14,6 +14,8 @@ namespace EventEngine\DocumentStore;
 use Codeliner\ArrayReader\ArrayReader;
 use EventEngine\DocumentStore\Exception\RuntimeException;
 use EventEngine\DocumentStore\Exception\UnknownCollection;
+use EventEngine\DocumentStore\Filter\AndFilter;
+use EventEngine\DocumentStore\Filter\EqFilter;
 use EventEngine\DocumentStore\Filter\Filter;
 use EventEngine\DocumentStore\OrderBy\AndOrder;
 use EventEngine\DocumentStore\OrderBy\Asc;
@@ -68,6 +70,7 @@ final class InMemoryDocumentStore implements DocumentStore
     public function addCollection(string $collectionName, Index ...$indices): void
     {
         $this->inMemoryConnection['documents'][$collectionName] = [];
+        $this->inMemoryConnection['documentIndices'][$collectionName] = $indices;
     }
 
     /**
@@ -78,12 +81,20 @@ final class InMemoryDocumentStore implements DocumentStore
     {
         if ($this->hasCollection($collectionName)) {
             unset($this->inMemoryConnection['documents'][$collectionName]);
+            unset($this->inMemoryConnection['documentIndices'][$collectionName]);
         }
     }
 
     public function hasCollectionIndex(string $collectionName, string $indexName): bool
     {
-        //InMemoryDocumentStore ignores indices
+        foreach ($this->inMemoryConnection['documentIndices'][$collectionName] as $index) {
+            if($index instanceof FieldIndex || $index instanceof MultiFieldIndex) {
+                if($index->name() === $indexName) {
+                    return true;
+                }
+            }
+        }
+
         return false;
     }
 
@@ -94,7 +105,11 @@ final class InMemoryDocumentStore implements DocumentStore
      */
     public function addCollectionIndex(string $collectionName, Index $index): void
     {
-        //InMemoryDocumentStore ignores indices
+        if($index instanceof FieldIndex || $index instanceof MultiFieldIndex) {
+            $this->dropCollectionIndex($collectionName, $index->name());
+        }
+
+        $this->inMemoryConnection['documentIndices'][] = $index;
     }
 
     /**
@@ -104,7 +119,27 @@ final class InMemoryDocumentStore implements DocumentStore
      */
     public function dropCollectionIndex(string $collectionName, $index): void
     {
-        //InMemoryDocumentStore ignores indices
+        if(is_string($index)) {
+            foreach ($this->inMemoryConnection['documentIndices'][$collectionName] as $idxI => $existingIndex) {
+                if($existingIndex instanceof FieldIndex || $existingIndex instanceof MultiFieldIndex) {
+                    if($existingIndex->name() === $index) {
+                        unset($this->inMemoryConnection['documentIndices'][$collectionName][$idxI]);
+                    }
+                }
+            }
+
+            $this->inMemoryConnection['documentIndices'][$collectionName] = array_values($this->inMemoryConnection['documentIndices'][$collectionName]);
+
+            return;
+        }
+
+        foreach ($this->inMemoryConnection['documentIndices'][$collectionName] as $idxI => $existingIndex) {
+            if($existingIndex === $index) {
+                unset($this->inMemoryConnection['documentIndices'][$collectionName][$idxI]);
+            }
+        }
+
+        $this->inMemoryConnection['documentIndices'][$collectionName] = array_values($this->inMemoryConnection['documentIndices'][$collectionName]);
     }
 
     /**
@@ -121,6 +156,8 @@ final class InMemoryDocumentStore implements DocumentStore
             throw new RuntimeException("Cannot add doc with id $docId. The doc already exists in collection $collectionName");
         }
 
+        $this->assertUniqueConstraints($collectionName, $docId, $doc);
+
         $this->inMemoryConnection['documents'][$collectionName][$docId] = $doc;
     }
 
@@ -133,8 +170,9 @@ final class InMemoryDocumentStore implements DocumentStore
     public function updateDoc(string $collectionName, string $docId, array $docOrSubset): void
     {
         $this->assertDocExists($collectionName, $docId);
+        $this->assertUniqueConstraints($collectionName, $docId, $docOrSubset);
 
-        $this->inMemoryConnection['documents'][$collectionName][$docId] = \array_merge(
+        $this->inMemoryConnection['documents'][$collectionName][$docId] = \array_replace_recursive(
             $this->inMemoryConnection['documents'][$collectionName][$docId],
             $docOrSubset
         );
@@ -228,10 +266,12 @@ final class InMemoryDocumentStore implements DocumentStore
         $filteredDocs = [];
 
         foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
-            if ($filter->match($doc, $docId)) {
+            if ($filter->match($doc, (string)$docId)) {
                 $filteredDocs[$docId] = $doc;
             }
         }
+
+        $filteredDocs = \array_values($filteredDocs);
 
         if ($orderBy !== null) {
             $this->sort($filteredDocs, $orderBy);
@@ -269,6 +309,104 @@ final class InMemoryDocumentStore implements DocumentStore
         if (! $this->hasDoc($collectionName, $docId)) {
             throw new RuntimeException("Doc with id $docId does not exist in collection $collectionName");
         }
+    }
+
+    private function assertUniqueConstraints(string $collectionName, string $docId, array $docOrSubset): void
+    {
+        $indices = $this->inMemoryConnection['documentIndices'][$collectionName];
+
+        foreach ($indices as $index) {
+            if($index instanceof FieldIndex) {
+                $this->assertUniqueFieldConstraint($collectionName, $docId, $docOrSubset, $index);
+            }
+
+            if($index instanceof MultiFieldIndex) {
+                $this->assertMultiFieldUniqueConstraint($collectionName, $docId, $docOrSubset, $index);
+            }
+        }
+    }
+
+    private function assertUniqueFieldConstraint(string $collectionName, string $docId, array $docOrSubset, FieldIndex $index): void
+    {
+        if(!$index->unique()) {
+            return;
+        }
+
+        $reader = new ArrayReader($docOrSubset);
+
+        if(!$reader->pathExists($index->field())) {
+            return;
+        }
+
+        $value = $reader->mixedValue($index->field());
+
+        $check = new EqFilter($index->field(), $value);
+
+        $existingDocs = $this->filterDocs($collectionName, $check);
+
+        foreach ($existingDocs as $existingDoc) {
+            throw new RuntimeException(
+                "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same value for field: {$index->field()} exists already!"
+            );
+        }
+
+        return;
+    }
+
+    private function assertMultiFieldUniqueConstraint(string $collectionName, string $docId, array $docOrSubset, MultiFieldIndex $index): void
+    {
+        if(!$index->unique()) {
+            return;
+        }
+
+        if($this->hasDoc($collectionName, $docId)) {
+            $effectedDoc = $this->getDoc($collectionName, $docId);
+            $docOrSubset = \array_replace_recursive($effectedDoc, $docOrSubset);
+        }
+
+        $reader = new ArrayReader($docOrSubset);
+
+        $checkList = [];
+        $notExistingFieldsCheckList = [];
+        $fieldNames = [];
+
+        foreach ($index->fields() as $fieldIndex) {
+            $fieldNames[] = $fieldIndex->field();
+            if($reader->pathExists($fieldIndex->field())) {
+                $checkList[] = new EqFilter($fieldIndex->field(), $reader->mixedValue($fieldIndex->field()));
+            } else {
+                $notExistingFieldsCheckList[] = new EqFilter($fieldIndex->field(), null);
+            }
+        }
+
+        if(count($checkList) === 0) {
+            return;
+        }
+
+        $checkList = array_merge($checkList, $notExistingFieldsCheckList);
+
+        if(count($checkList) > 1) {
+            $a = $checkList[0];
+            $b = $checkList[1];
+            $rest = array_slice($checkList, 2);
+            if(!$rest) {
+                $rest = [];
+            }
+            $checkList = new AndFilter($a, $b, ...$rest);
+        } else {
+            $checkList = $checkList[0];
+        }
+
+        $existingDocs = $this->filterDocs($collectionName, $checkList);
+
+        foreach ($existingDocs as $existingDoc) {
+            $fieldNamesStr = implode(", ", $fieldNames);
+            throw new RuntimeException(
+                "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same values for fields: {$fieldNamesStr} exists already!"
+            );
+        }
+
+        return;
     }
 
     private function sort(&$docs, OrderBy $orderBy)
