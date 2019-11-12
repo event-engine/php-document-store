@@ -33,7 +33,8 @@
   },
   "autoload-dev": {
     "psr-4": {
-      "EventEngineTest\\DocumentStore\\": "tests/"
+      "EventEngineTest\\DocumentStore\\": "tests/",
+      "EventEngine\\Persistence\\": "tests/Persistence"
     }
   },
   "prefer-stable": true,
