@@ -136,4 +136,68 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
         $this->store->updateDoc('test', '2', ['some' => ['prop' => 'foo']]);
     }
+
+    /**
+     * @test
+     */
+    public function it_blocks_adding_a_unique_index_if_it_conflicts_with_existing_docs()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
+
+        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $uniqueIndex = FieldIndex::forField('some.prop', FieldIndex::SORT_ASC, true);
+        $this->store->addCollectionIndex('test', $uniqueIndex);
+    }
+
+    /**
+     * @test
+     */
+    public function it_does_not_block_adding_a_unique_index_if_no_conflict_exists()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'baz']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
+
+        $uniqueIndex = FieldIndex::namedIndexForField('test_idx', 'some.other.prop', FieldIndex::SORT_ASC, true);
+        $this->store->addCollectionIndex('test', $uniqueIndex);
+        $this->assertTrue($this->store->hasCollectionIndex('test', 'test_idx'));
+    }
+
+    /**
+     * @test
+     */
+    public function it_blocks_adding_a_unique_multi_field_index_if_it_conflicts_with_existing_docs()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
+
+        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $uniqueIndex = MultiFieldIndex::forFields(['some.prop', 'some.other.prop'], true);
+        $this->store->addCollectionIndex('test', $uniqueIndex);
+    }
+
+    /**
+     * @test
+     */
+    public function it_does_not_block_adding_a_unique_multi_field_index_if_no_conflict_exists()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
+
+        $uniqueIndex = MultiFieldIndex::namedIndexForFields('test_idx', ['some.prop', 'some.other.prop'], true);
+        $this->store->addCollectionIndex('test', $uniqueIndex);
+        $this->assertTrue($this->store->hasCollectionIndex('test', 'test_idx'));
+    }
 }

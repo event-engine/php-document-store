@@ -15,6 +15,7 @@ use Codeliner\ArrayReader\ArrayReader;
 use EventEngine\DocumentStore\Exception\RuntimeException;
 use EventEngine\DocumentStore\Exception\UnknownCollection;
 use EventEngine\DocumentStore\Filter\AndFilter;
+use EventEngine\DocumentStore\Filter\AnyFilter;
 use EventEngine\DocumentStore\Filter\EqFilter;
 use EventEngine\DocumentStore\Filter\Filter;
 use EventEngine\DocumentStore\OrderBy\AndOrder;
@@ -89,6 +90,7 @@ final class InMemoryDocumentStore implements DocumentStore
     {
         foreach ($this->inMemoryConnection['documentIndices'][$collectionName] as $index) {
             if($index instanceof FieldIndex || $index instanceof MultiFieldIndex) {
+                echo $index->name();
                 if($index->name() === $indexName) {
                     return true;
                 }
@@ -105,11 +107,39 @@ final class InMemoryDocumentStore implements DocumentStore
      */
     public function addCollectionIndex(string $collectionName, Index $index): void
     {
+        $this->assertHasCollection($collectionName);
+
         if($index instanceof FieldIndex || $index instanceof MultiFieldIndex) {
             $this->dropCollectionIndex($collectionName, $index->name());
         }
 
-        $this->inMemoryConnection['documentIndices'][] = $index;
+        $docsCount = count($this->inMemoryConnection['documents'][$collectionName]);
+
+        if($docsCount > 1 && ($index instanceof FieldIndex || $index instanceof MultiFieldIndex)  && $index->unique()) {
+            $uniqueErrMsg = "Unique constraint violation. Cannot add unique index because existing documents conflict with it!";
+            $assertMethod = $index instanceof FieldIndex? 'assertUniqueFieldConstraint' : 'assertMultiFieldUniqueConstraint';
+            $checkCount = 0;
+            $halfOfDocs = $docsCount / 2;
+
+            foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $document) {
+                if($checkCount > $halfOfDocs) {
+                    break;
+                }
+
+                // Temp unset to prevent false positives
+                unset($this->inMemoryConnection['documents'][$collectionName][$docId]);
+                try {
+                    $this->{$assertMethod}($collectionName, (string)$docId, $document, $index, $uniqueErrMsg);
+                } catch (\Throwable $e) {
+                    $this->inMemoryConnection['documents'][$collectionName][$docId] = $document;
+                    throw $e;
+                }
+
+                $checkCount++;
+            }
+        }
+
+        $this->inMemoryConnection['documentIndices'][$collectionName][] = $index;
     }
 
     /**
@@ -326,7 +356,7 @@ final class InMemoryDocumentStore implements DocumentStore
         }
     }
 
-    private function assertUniqueFieldConstraint(string $collectionName, string $docId, array $docOrSubset, FieldIndex $index): void
+    private function assertUniqueFieldConstraint(string $collectionName, string $docId, array $docOrSubset, FieldIndex $index, string $errMsg = null): void
     {
         if(!$index->unique()) {
             return;
@@ -346,14 +376,14 @@ final class InMemoryDocumentStore implements DocumentStore
 
         foreach ($existingDocs as $existingDoc) {
             throw new RuntimeException(
-                "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same value for field: {$index->field()} exists already!"
+                $errMsg ?? "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same value for field: {$index->field()} exists already!"
             );
         }
 
         return;
     }
 
-    private function assertMultiFieldUniqueConstraint(string $collectionName, string $docId, array $docOrSubset, MultiFieldIndex $index): void
+    private function assertMultiFieldUniqueConstraint(string $collectionName, string $docId, array $docOrSubset, MultiFieldIndex $index, string $errMsg = null): void
     {
         if(!$index->unique()) {
             return;
@@ -402,7 +432,7 @@ final class InMemoryDocumentStore implements DocumentStore
         foreach ($existingDocs as $existingDoc) {
             $fieldNamesStr = implode(", ", $fieldNames);
             throw new RuntimeException(
-                "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same values for fields: {$fieldNamesStr} exists already!"
+                $errMsg ?? "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same values for fields: {$fieldNamesStr} exists already!"
             );
         }
 
