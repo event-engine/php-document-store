@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace EventEngineTest\DocumentStore;
 
 use EventEngine\DocumentStore\FieldIndex;
+use EventEngine\DocumentStore\Filter\AnyFilter;
 use EventEngine\DocumentStore\Filter\EqFilter;
 use EventEngine\DocumentStore\InMemoryDocumentStore;
 use EventEngine\DocumentStore\MultiFieldIndex;
@@ -199,5 +200,51 @@ final class InMemoryDocumentStoreTest extends TestCase
         $uniqueIndex = MultiFieldIndex::namedIndexForFields('test_idx', ['some.prop', 'some.other.prop'], true);
         $this->store->addCollectionIndex('test', $uniqueIndex);
         $this->assertTrue($this->store->hasCollectionIndex('test', 'test_idx'));
+    }
+
+    /**
+     * @test
+     */
+    public function it_updates_many()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
+
+        $this->store->updateMany(
+            'test',
+            new EqFilter('some.other.prop', 'bat'),
+            ['some' => ['prop' => 'fuzz']]
+        );
+
+        $filteredDocs = iterator_to_array($this->store->filterDocs('test', new EqFilter('some.prop', 'fuzz')));
+
+        $this->assertCount(2, $filteredDocs);
+        $this->assertEquals('fuzz', $filteredDocs[0]['some']['prop']);
+        $this->assertEquals('fuzz', $filteredDocs[1]['some']['prop']);
+    }
+
+    /**
+     * @test
+     */
+    public function it_deletes_many()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
+
+        $this->store->deleteMany(
+            'test',
+            new EqFilter('some.other.prop', 'bat')
+        );
+
+        $filteredDocs = iterator_to_array($this->store->filterDocs('test', new AnyFilter()));
+        
+        $this->assertCount(1, $filteredDocs);
+        $this->assertEquals(['some' => ['prop' => 'bar']], $filteredDocs[0]);
     }
 }

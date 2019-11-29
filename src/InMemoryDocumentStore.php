@@ -216,10 +216,14 @@ final class InMemoryDocumentStore implements DocumentStore
      */
     public function updateMany(string $collectionName, Filter $filter, array $set): void
     {
-        $docs = $this->filterDocs($collectionName, $filter);
+        $this->assertHasCollection($collectionName);
+
+        $docs = $this->inMemoryConnection['documents'][$collectionName];
 
         foreach ($docs as $docId => $doc) {
-            $this->updateDoc($collectionName, $docId, $set);
+            if ($filter->match($doc, (string)$docId)) {
+                $this->updateDoc($collectionName, (string)$docId, $set);
+            }
         }
     }
 
@@ -259,10 +263,14 @@ final class InMemoryDocumentStore implements DocumentStore
      */
     public function deleteMany(string $collectionName, Filter $filter): void
     {
-        $docs = $this->filterDocs($collectionName, $filter);
+        $this->assertHasCollection($collectionName);
+
+        $docs = $this->inMemoryConnection['documents'][$collectionName];
 
         foreach ($docs as $docId => $doc) {
-            $this->deleteDoc($collectionName, $docId);
+            if ($filter->match($doc, (string)$docId)) {
+                $this->deleteDoc($collectionName, (string)$docId);
+            }
         }
     }
 
