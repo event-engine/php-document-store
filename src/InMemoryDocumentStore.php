@@ -90,7 +90,6 @@ final class InMemoryDocumentStore implements DocumentStore
     {
         foreach ($this->inMemoryConnection['documentIndices'][$collectionName] as $index) {
             if($index instanceof FieldIndex || $index instanceof MultiFieldIndex) {
-                echo $index->name();
                 if($index->name() === $indexName) {
                     return true;
                 }
