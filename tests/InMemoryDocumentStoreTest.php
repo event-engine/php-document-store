@@ -119,7 +119,32 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'foo']]);
     }
 
+    /**
+     * @test
+     */
+    public function it_ensures_unique_constraints_for_a_field_for_update()
+    {
+        $this->store->addCollection('test', FieldIndex::namedIndexForField('unique_prop_idx', 'some.prop', FieldIndex::SORT_ASC, true));
 
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo']]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar']]);
+
+        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->store->updateDoc('test', '2', ['some' => ['prop' => 'foo']]);
+    }
+
+    /**
+     * @test
+     * @doesNotPerformAssertions
+     */
+    public function it_allows_updating_with_unique_constraints_for_a_field()
+    {
+        $this->store->addCollection('test', FieldIndex::namedIndexForField('unique_prop_idx', 'some.prop', FieldIndex::SORT_ASC, true));
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo']]);
+
+        $this->store->updateDoc('test', '1', ['some' => ['prop' => 'foo', 'new' => 'prop']]);
+    }
 
     /**
      * @test
@@ -132,10 +157,41 @@ final class InMemoryDocumentStoreTest extends TestCase
 
         $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
+
+        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->store->addDoc('test', '4', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+    }
+
+    /**
+     * @test
+     */
+    public function it_ensures_unique_constraints_for_multiple_fields_for_update()
+    {
+        $multiFieldIndex = MultiFieldIndex::forFields(['some.prop', 'some.other.prop'], true);
+
+        $this->store->addCollection('test', $multiFieldIndex);
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
 
         $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
         $this->store->updateDoc('test', '2', ['some' => ['prop' => 'foo']]);
+    }
+
+    /**
+     * @test
+     * @doesNotPerformAssertions
+     */
+    public function it_allows_updating_with_unique_constraints_for_multiple_fields()
+    {
+        $multiFieldIndex = MultiFieldIndex::forFields(['some.prop', 'some.other.prop'], true);
+
+        $this->store->addCollection('test', $multiFieldIndex);
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+
+        $this->store->updateDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat'], 'new' => 'prop']]);
     }
 
     /**

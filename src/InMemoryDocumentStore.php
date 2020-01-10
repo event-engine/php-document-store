@@ -379,9 +379,15 @@ final class InMemoryDocumentStore implements DocumentStore
 
         $check = new EqFilter($index->field(), $value);
 
-        $existingDocs = $this->filterDocs($collectionName, $check);
+        foreach ($this->inMemoryConnection['documents'][$collectionName] as $existingDocId => $existingDoc) {
+            if (!$check->match($existingDoc, (string)$existingDocId)) {
+                continue;
+            }
 
-        foreach ($existingDocs as $existingDoc) {
+            if ((string)$existingDocId === $docId) {
+                continue;
+            }
+
             throw new RuntimeException(
                 $errMsg ?? "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same value for field: {$index->field()} exists already!"
             );
@@ -434,9 +440,15 @@ final class InMemoryDocumentStore implements DocumentStore
             $checkList = $checkList[0];
         }
 
-        $existingDocs = $this->filterDocs($collectionName, $checkList);
+        foreach ($this->inMemoryConnection['documents'][$collectionName] as $existingDocId => $existingDoc) {
+            if (!$checkList->match($existingDoc, (string)$existingDocId)) {
+                continue;
+            }
 
-        foreach ($existingDocs as $existingDoc) {
+            if ((string)$existingDocId === $docId) {
+                continue;
+            }
+
             $fieldNamesStr = implode(", ", $fieldNames);
             throw new RuntimeException(
                 $errMsg ?? "Unique constraint violation. Cannot insert or update document with id $docId, because a document with same values for fields: {$fieldNamesStr} exists already!"
