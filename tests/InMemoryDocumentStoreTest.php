@@ -4,8 +4,12 @@ declare(strict_types=1);
 namespace EventEngineTest\DocumentStore;
 
 use EventEngine\DocumentStore\FieldIndex;
+use EventEngine\DocumentStore\Filter\AndFilter;
 use EventEngine\DocumentStore\Filter\AnyFilter;
 use EventEngine\DocumentStore\Filter\EqFilter;
+use EventEngine\DocumentStore\Filter\GtFilter;
+use EventEngine\DocumentStore\Filter\LtFilter;
+use EventEngine\DocumentStore\Filter\OrFilter;
 use EventEngine\DocumentStore\InMemoryDocumentStore;
 use EventEngine\DocumentStore\MultiFieldIndex;
 use EventEngine\Persistence\InMemoryConnection;
@@ -103,6 +107,25 @@ final class InMemoryDocumentStoreTest extends TestCase
 
         $filteredDocs = iterator_to_array($this->store->filterDocs('test', new EqFilter('some.prop', 'fuzz')));
         $this->assertEquals(42, $filteredDocs[0]['some']['other']['nested']);
+    }
+
+    /**
+     * @test
+     */
+    public function it_retrieves_doc_ids_by_filter()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', 'a', ['number' => 10]);
+        $this->store->addDoc('test', 'b', ['number' => 20]);
+        $this->store->addDoc('test', 'c', ['number' => 30]);
+
+        $result = $this->store->filterDocIds('test', new OrFilter(
+            new GtFilter('number', 21),
+            new LtFilter('number', 19)
+        ));
+
+        $this->assertEquals(['a', 'c'], $result);
     }
 
     /**

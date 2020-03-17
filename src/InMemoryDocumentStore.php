@@ -323,6 +323,27 @@ final class InMemoryDocumentStore implements DocumentStore
         return new \ArrayIterator($filteredDocs);
     }
 
+    /**
+     * @param string $collectionName
+     * @param Filter $filter
+     * @return array
+     */
+    public function filterDocIds(
+        string $collectionName,
+        Filter $filter
+    ): array {
+        $this->assertHasCollection($collectionName);
+
+        $docIds = [];
+        foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
+            if ($filter->match($doc, (string)$docId)) {
+                $docIds[] = $docId;
+            }
+        }
+
+        return $docIds;
+    }
+
     private function hasDoc(string $collectionName, string $docId): bool
     {
         if (! $this->hasCollection($collectionName)) {
