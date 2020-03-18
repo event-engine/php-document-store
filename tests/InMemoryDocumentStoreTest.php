@@ -326,4 +326,45 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->assertCount(1, $filteredDocs);
         $this->assertEquals(['some' => ['prop' => 'bar']], $filteredDocs[0]);
     }
+
+    /**
+     * @test
+     */
+    public function it_does_not_update_numeric_arrays_recursively()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', 'doc', [
+            'a' => ['a' => 10, 'b' => 20],
+            'b' => [10, 20, 30],
+            'c' => [],
+            'd' => [false, true],
+            'e' => ['a' => 'b'],
+            'f' => [10, 20],
+            'g' => ['x' => 10, 'y' => 20],
+        ]);
+
+        $this->store->updateDoc('test', 'doc', [
+            'a' => ['b' => 21, 'c' => 30],
+            'b' => [10, 30],
+            'c' => [true],
+            'd' => [],
+            'e' => [],
+            'f' => ['x' => 10, 'y' => 20],
+            'g' => [30, 40]
+        ]);
+
+        $this->assertEquals(
+            [
+                'a' => ['a' => 10, 'b' => 21, 'c' => 30],
+                'b' => [10, 30],
+                'c' => [true],
+                'd' => [],
+                'e' => ['a' => 'b'],
+                'f' => [10, 20, 'x' => 10, 'y' => 20],
+                'g' => ['x' => 10, 'y' => 20, 30, 40]
+            ],
+            $this->store->getDoc('test', 'doc')
+        );
+    }
 }
