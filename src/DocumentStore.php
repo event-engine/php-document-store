@@ -127,6 +127,8 @@ interface DocumentStore
     public function getDoc(string $collectionName, string $docId): ?array;
 
     /**
+     * @deprecated use findDocs instead
+     *
      * @param string $collectionName
      * @param Filter $filter
      * @param int|null $skip
@@ -136,6 +138,29 @@ interface DocumentStore
      * @throws UnknownCollection
      */
     public function filterDocs(string $collectionName, Filter $filter, int $skip = null, int $limit = null, OrderBy $orderBy = null): \Traversable;
+
+    /**
+     * @param string $collectionName
+     * @param Filter $filter
+     * @param int|null $skip
+     * @param int|null $limit
+     * @param OrderBy|null $orderBy
+     * @return \Traversable list of docs with key being the docId and value being the stored doc
+     * @throws UnknownCollection
+     */
+    public function findDocs(string $collectionName, Filter $filter, int $skip = null, int $limit = null, OrderBy $orderBy = null): \Traversable;
+
+    /**
+     * @param string $collectionName
+     * @param PartialSelect $partialSelect
+     * @param Filter $filter
+     * @param int|null $skip
+     * @param int|null $limit
+     * @param OrderBy|null $orderBy
+     * @return \Traversable list of docs with key being the docId and value being the stored doc
+     * @throws UnknownCollection
+     */
+    public function findPartialDocs(string $collectionName, PartialSelect $partialSelect, Filter $filter, int $skip = null, int $limit = null, OrderBy $orderBy = null): \Traversable;
 
     /**
      * @param string $collectionName
