@@ -136,4 +136,11 @@ interface DocumentStore
      * @throws UnknownCollection
      */
     public function filterDocs(string $collectionName, Filter $filter, int $skip = null, int $limit = null, OrderBy $orderBy = null): \Traversable;
+
+    /**
+     * @param string $collectionName
+     * @param Filter $filter
+     * @return array
+     */
+    public function filterDocIds(string $collectionName, Filter $filter): array;
 }
