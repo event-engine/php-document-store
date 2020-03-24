@@ -143,4 +143,12 @@ interface DocumentStore
      * @return array
      */
     public function filterDocIds(string $collectionName, Filter $filter): array;
+
+    /**
+     * @param string $collectionName
+     * @param Filter $filter
+     * @return int The number of documents
+     * @throws UnknownCollection
+     */
+    public function countDocs(string $collectionName, Filter $filter): int;
 }
