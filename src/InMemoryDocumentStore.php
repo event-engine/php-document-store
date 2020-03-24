@@ -572,4 +572,21 @@ final class InMemoryDocumentStore implements DocumentStore
 
         return \array_keys($array) === \range(0, \count($array) - 1);
     }
+
+    /**
+     * @inheritDoc
+     */
+    public function countDocs(string $collectionName, Filter $filter) : int
+    {
+        $this->assertHasCollection($collectionName);
+
+        $counter = 0;
+        foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
+            if ($filter->match($doc, $docId)) {
+                $counter++;
+            }
+        }
+
+        return $counter;
+    }
 }
