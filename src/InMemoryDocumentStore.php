@@ -15,7 +15,6 @@ use Codeliner\ArrayReader\ArrayReader;
 use EventEngine\DocumentStore\Exception\RuntimeException;
 use EventEngine\DocumentStore\Exception\UnknownCollection;
 use EventEngine\DocumentStore\Filter\AndFilter;
-use EventEngine\DocumentStore\Filter\AnyFilter;
 use EventEngine\DocumentStore\Filter\EqFilter;
 use EventEngine\DocumentStore\Filter\Filter;
 use EventEngine\DocumentStore\OrderBy\AndOrder;
@@ -23,6 +22,11 @@ use EventEngine\DocumentStore\OrderBy\Asc;
 use EventEngine\DocumentStore\OrderBy\Desc;
 use EventEngine\DocumentStore\OrderBy\OrderBy;
 use EventEngine\Persistence\InMemoryConnection;
+use function array_key_exists;
+use function count;
+use function explode;
+use function is_array;
+use function json_encode;
 
 final class InMemoryDocumentStore implements DocumentStore
 {
@@ -284,12 +288,7 @@ final class InMemoryDocumentStore implements DocumentStore
     }
 
     /**
-     * @param string $collectionName
-     * @param Filter $filter
-     * @param int|null $skip
-     * @param int|null $limit
-     * @param OrderBy|null $orderBy
-     * @return \Traversable list of docs
+     * @inheritDoc
      */
     public function filterDocs(
         string $collectionName,
@@ -304,7 +303,7 @@ final class InMemoryDocumentStore implements DocumentStore
 
         foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
             if ($filter->match($doc, (string)$docId)) {
-                $filteredDocs[$docId] = $doc;
+                $filteredDocs[$docId] = ['doc' => $doc, 'docId' => $docId];
             }
         }
 
@@ -320,7 +319,102 @@ final class InMemoryDocumentStore implements DocumentStore
             $filteredDocs = \array_slice($filteredDocs, 0, $limit);
         }
 
-        return new \ArrayIterator($filteredDocs);
+        $docsMap = [];
+
+        foreach ($filteredDocs as $docAndId) {
+            $docsMap[] = $docAndId['doc'];
+        }
+
+        return new \ArrayIterator($docsMap);
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function findDocs(
+        string $collectionName,
+        Filter $filter,
+        int $skip = null,
+        int $limit = null,
+        OrderBy $orderBy = null): \Traversable
+    {
+        $this->assertHasCollection($collectionName);
+
+        $filteredDocs = [];
+
+        foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
+            if ($filter->match($doc, (string)$docId)) {
+                $filteredDocs[$docId] = ['doc' => $doc, 'docId' => $docId];
+            }
+        }
+
+        $filteredDocs = \array_values($filteredDocs);
+
+        if ($orderBy !== null) {
+            $this->sort($filteredDocs, $orderBy);
+        }
+
+        if ($skip !== null) {
+            $filteredDocs = \array_slice($filteredDocs, $skip, $limit);
+        } elseif ($limit !== null) {
+            $filteredDocs = \array_slice($filteredDocs, 0, $limit);
+        }
+
+        $docsMap = [];
+
+        foreach ($filteredDocs as $docAndId) {
+            $docsMap[$docAndId['docId']] = $docAndId['doc'];
+        }
+
+        return new \ArrayIterator($docsMap);
+    }
+
+    /**
+     * @param string $collectionName
+     * @param PartialSelect $partialSelect
+     * @param Filter $filter
+     * @param int|null $skip
+     * @param int|null $limit
+     * @param OrderBy|null $orderBy
+     * @return \Traversable list of docs
+     */
+    public function findPartialDocs(
+        string $collectionName,
+        PartialSelect $partialSelect,
+        Filter $filter,
+        int $skip = null,
+        int $limit = null,
+        OrderBy $orderBy = null): \Traversable
+    {
+        $this->assertHasCollection($collectionName);
+
+        $filteredDocs = [];
+
+        foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
+            if ($filter->match($doc, (string)$docId)) {
+                $filteredDocs[$docId] = ['doc' => $doc, 'docId' => $docId];
+            }
+        }
+
+        $filteredDocs = \array_values($filteredDocs);
+
+        if ($orderBy !== null) {
+            $this->sort($filteredDocs, $orderBy);
+        }
+
+        if ($skip !== null) {
+            $filteredDocs = \array_slice($filteredDocs, $skip, $limit);
+        } elseif ($limit !== null) {
+            $filteredDocs = \array_slice($filteredDocs, 0, $limit);
+        }
+
+        $docsMap = [];
+
+        foreach ($filteredDocs as $docAndId) {
+            $docsMap[$docAndId['docId']] = $this->transformToPartialDoc($docAndId['doc'], $partialSelect);
+        }
+
+        return new \ArrayIterator($docsMap);
     }
 
     /**
@@ -342,6 +436,23 @@ final class InMemoryDocumentStore implements DocumentStore
         }
 
         return $docIds;
+    }
+
+    /**
+     * @inheritDoc
+     */
+    public function countDocs(string $collectionName, Filter $filter) : int
+    {
+        $this->assertHasCollection($collectionName);
+
+        $counter = 0;
+        foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
+            if ($filter->match($doc, $docId)) {
+                $counter++;
+            }
+        }
+
+        return $counter;
     }
 
     private function hasDoc(string $collectionName, string $docId): bool
@@ -489,12 +600,12 @@ final class InMemoryDocumentStore implements DocumentStore
             if ($orderBy instanceof Asc || $orderBy instanceof Desc) {
                 $field = $orderBy->prop();
 
-                return (new ArrayReader($doc))->mixedValue($field);
+                return (new ArrayReader($doc['doc']))->mixedValue($field);
             }
 
             throw new \RuntimeException(\sprintf(
                 'Unable to get field from doc: %s. Given OrderBy is neither an instance of %s nor %s',
-                \json_encode($doc),
+                \json_encode($doc['doc']),
                 Asc::class,
                 Desc::class
             ));
@@ -573,20 +684,43 @@ final class InMemoryDocumentStore implements DocumentStore
         return \array_keys($array) === \range(0, \count($array) - 1);
     }
 
-    /**
-     * @inheritDoc
-     */
-    public function countDocs(string $collectionName, Filter $filter) : int
+    private function transformToPartialDoc(array $doc, PartialSelect $partialSelect): array
     {
-        $this->assertHasCollection($collectionName);
+        $partialDoc = [];
+        $reader = new ArrayReader($doc);
 
-        $counter = 0;
-        foreach ($this->inMemoryConnection['documents'][$collectionName] as $docId => $doc) {
-            if ($filter->match($doc, $docId)) {
-                $counter++;
+        foreach ($partialSelect->fieldAliasMap() as ['field' => $field, 'alias' => $alias]) {
+            $value = $reader->mixedValue($field);
+
+            if($alias === PartialSelect::MERGE_ALIAS) {
+                if(null === $value) {
+                    continue;
+                }
+
+                if(!is_array($value)) {
+                    throw new RuntimeException('Merge not possible. $merge alias was specified for field: ' . $field . ' but field value is not an array: ' . json_encode($value));
+                }
+
+                foreach ($value as $k => $v) {
+                    $partialDoc[$k] = $v;
+                }
+
+                continue;
             }
+
+            $keys = explode('.', $alias);
+
+            $ref = &$partialDoc;
+            foreach ($keys as $i => $key) {
+                if(!array_key_exists($key, $ref)) {
+                    $ref[$key] = [];
+                }
+                $ref = &$ref[$key];
+            }
+            $ref = $value;
+            unset($ref);
         }
 
-        return $counter;
+        return $partialDoc;
     }
 }

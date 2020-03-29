@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace EventEngineTest\DocumentStore;
 
 use EventEngine\DocumentStore\FieldIndex;
-use EventEngine\DocumentStore\Filter\AndFilter;
 use EventEngine\DocumentStore\Filter\AnyFilter;
 use EventEngine\DocumentStore\Filter\EqFilter;
 use EventEngine\DocumentStore\Filter\GtFilter;
@@ -12,8 +11,11 @@ use EventEngine\DocumentStore\Filter\LtFilter;
 use EventEngine\DocumentStore\Filter\OrFilter;
 use EventEngine\DocumentStore\InMemoryDocumentStore;
 use EventEngine\DocumentStore\MultiFieldIndex;
+use EventEngine\DocumentStore\PartialSelect;
 use EventEngine\Persistence\InMemoryConnection;
 use PHPUnit\Framework\TestCase;
+use function array_values;
+use function iterator_to_array;
 
 final class InMemoryDocumentStoreTest extends TestCase
 {
@@ -75,7 +77,7 @@ final class InMemoryDocumentStoreTest extends TestCase
 
         $filter = new EqFilter('baz', 'changed val');
 
-        $filteredDocs = $this->store->filterDocs('test', $filter);
+        $filteredDocs = $this->store->findDocs('test', $filter);
 
         $this->assertCount(1, $filteredDocs);
     }
@@ -105,7 +107,7 @@ final class InMemoryDocumentStoreTest extends TestCase
             ]
         ]);
 
-        $filteredDocs = iterator_to_array($this->store->filterDocs('test', new EqFilter('some.prop', 'fuzz')));
+        $filteredDocs = array_values(iterator_to_array($this->store->findDocs('test', new EqFilter('some.prop', 'fuzz'))));
         $this->assertEquals(42, $filteredDocs[0]['some']['other']['nested']);
     }
 
@@ -126,6 +128,186 @@ final class InMemoryDocumentStoreTest extends TestCase
         ));
 
         $this->assertEquals(['a', 'c'], $result);
+    }
+
+    /**
+     * @test
+     */
+    public function it_retrieves_docs_by_filter_using_filterDocs()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', 'a', ['number' => 10]);
+        $this->store->addDoc('test', 'b', ['number' => 20]);
+        $this->store->addDoc('test', 'c', ['number' => 30]);
+
+        $result = iterator_to_array($this->store->filterDocs('test', new OrFilter(
+            new GtFilter('number', 21),
+            new LtFilter('number', 19)
+        )));
+
+        $this->assertEquals([['number' => 10], ['number' => 30]], $result);
+    }
+
+    /**
+     * @test
+     */
+    public function it_finds_docs_and_ids_by_filter()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', 'a', ['number' => 10]);
+        $this->store->addDoc('test', 'b', ['number' => 20]);
+        $this->store->addDoc('test', 'c', ['number' => 30]);
+
+        $result = iterator_to_array($this->store->findDocs('test', new OrFilter(
+            new GtFilter('number', 21),
+            new LtFilter('number', 19)
+        )));
+
+        $this->assertEquals(['a' => ['number' => 10], 'c' => ['number' => 30]], $result);
+    }
+
+    /**
+     * @test
+     */
+    public function it_filters_partial_docs()
+    {
+        $this->store->addCollection('test');
+
+        $docA = [
+            'some' => [
+                'prop' => 'foo',
+                'other' => [
+                    'nested' => 42
+                ]
+            ],
+            'baz' => 'bat',
+        ];
+        $this->store->addDoc('test', 'a', $docA);
+
+        $docB = [
+            'some' => [
+                'prop' => 'bar',
+                'other' => [
+                    'nested' => 43
+                ],
+                //'baz' => 'bat', missing so should be null
+            ],
+        ];
+        $this->store->addDoc('test', 'b', $docB);
+
+        $docC = [
+            'some' => [
+                'prop' => 'foo',
+                'other' => [
+                    //'nested' => 42, missing, so should be null
+                    'ignoredNested' => 'value'
+                ]
+            ],
+            'baz' => 'bat',
+        ];
+        $this->store->addDoc('test', 'c', $docC);
+
+        $partialSelect = new PartialSelect([
+            'some.alias' => 'some.prop', // Nested alias <- Nested field
+            'magicNumber' => 'some.other.nested', // Top level alias <- Nested Field
+            'baz', // Top level field
+        ]);
+
+        $result = iterator_to_array($this->store->findPartialDocs('test', $partialSelect, new AnyFilter()));
+
+        $this->assertEquals([
+            'some' => [
+                'alias' => 'foo',
+            ],
+            'magicNumber' => 42,
+            'baz' => 'bat'
+        ], $result['a']);
+
+        $this->assertEquals([
+            'some' => [
+                'alias' => 'bar',
+            ],
+            'magicNumber' => 43,
+            'baz' => null
+        ], $result['b']);
+
+        $this->assertEquals([
+            'some' => [
+                'alias' => 'foo',
+            ],
+            'magicNumber' => null,
+            'baz' => 'bat'
+        ], $result['c']);
+    }
+
+    /**
+     * @test
+     */
+    public function it_applies_merge_alias_for_nested_fields_if_specified()
+    {
+        $this->store->addCollection('test');
+
+        $docA = [
+            'some' => [
+                'prop' => 'foo',
+                'other' => [
+                    'nested' => 42
+                ]
+            ],
+            'baz' => 'bat',
+        ];
+        $this->store->addDoc('test', 'a', $docA);
+
+        $docB = [
+            'differentTopLevel' => [
+                'prop' => 'bar',
+                'other' => [
+                    'nested' => 43
+                ],
+            ],
+            'baz' => 'bat',
+        ];
+        $this->store->addDoc('test', 'b', $docB);
+
+        $docC = [
+            'some' => [
+                'prop' => 'foo',
+                'other' => [
+                    'nested' => 43
+                ],
+            ],
+            //'baz' => 'bat', missing top level
+        ];
+        $this->store->addDoc('test', 'c', $docC);
+
+        $partialSelect = new PartialSelect([
+            '$merge' => 'some', // $merge alias <- Nested field
+            'baz', // Top level field
+        ]);
+
+        $result = iterator_to_array($this->store->findPartialDocs('test', $partialSelect, new AnyFilter()));
+
+        $this->assertEquals([
+            'prop' => 'foo',
+            'other' => [
+                'nested' => 42
+            ],
+            'baz' => 'bat'
+        ], $result['a']);
+
+        $this->assertEquals([
+            'baz' => 'bat',
+        ], $result['b']);
+
+        $this->assertEquals([
+            'prop' => 'foo',
+            'other' => [
+                'nested' => 43
+            ],
+            'baz' => null
+        ], $result['c']);
     }
 
     /**
@@ -298,7 +480,7 @@ final class InMemoryDocumentStoreTest extends TestCase
             ['some' => ['prop' => 'fuzz']]
         );
 
-        $filteredDocs = iterator_to_array($this->store->filterDocs('test', new EqFilter('some.prop', 'fuzz')));
+        $filteredDocs = array_values(iterator_to_array($this->store->findDocs('test', new EqFilter('some.prop', 'fuzz'))));
 
         $this->assertCount(2, $filteredDocs);
         $this->assertEquals('fuzz', $filteredDocs[0]['some']['prop']);
@@ -321,7 +503,7 @@ final class InMemoryDocumentStoreTest extends TestCase
             new EqFilter('some.other.prop', 'bat')
         );
 
-        $filteredDocs = iterator_to_array($this->store->filterDocs('test', new AnyFilter()));
+        $filteredDocs = array_values(iterator_to_array($this->store->findDocs('test', new AnyFilter())));
         
         $this->assertCount(1, $filteredDocs);
         $this->assertEquals(['some' => ['prop' => 'bar']], $filteredDocs[0]);
