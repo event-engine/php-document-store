@@ -127,6 +127,14 @@ interface DocumentStore
     public function getDoc(string $collectionName, string $docId): ?array;
 
     /**
+     * @param string $collectionName
+     * @param PartialSelect $partialSelect
+     * @param string $docId
+     * @return array|null
+     */
+    public function getPartialDoc(string $collectionName, PartialSelect $partialSelect, string $docId): ?array;
+
+    /**
      * @deprecated use findDocs instead
      *
      * @param string $collectionName

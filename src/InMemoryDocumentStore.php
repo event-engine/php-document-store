@@ -290,6 +290,20 @@ final class InMemoryDocumentStore implements DocumentStore
     /**
      * @inheritDoc
      */
+    public function getPartialDoc(string $collectionName, PartialSelect $partialSelect, string $docId): ?array
+    {
+        $doc = $this->inMemoryConnection['documents'][$collectionName][$docId] ?? null;
+
+        if(null === $doc) {
+            return null;
+        }
+
+        return $this->transformToPartialDoc($doc, $partialSelect);
+    }
+
+    /**
+     * @inheritDoc
+     */
     public function filterDocs(
         string $collectionName,
         Filter $filter,
