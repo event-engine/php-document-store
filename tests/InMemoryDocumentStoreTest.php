@@ -245,6 +245,68 @@ final class InMemoryDocumentStoreTest extends TestCase
     /**
      * @test
      */
+    public function it_gets_partial_doc_by_id()
+    {
+        $this->store->addCollection('test');
+
+        $docA = [
+            'some' => [
+                'prop' => 'foo',
+                'other' => [
+                    'nested' => 42
+                ]
+            ],
+            'baz' => 'bat',
+        ];
+        $this->store->addDoc('test', 'a', $docA);
+
+        $docB = [
+            'some' => [
+                'prop' => 'bar',
+                'other' => [
+                    'nested' => 43
+                ],
+                //'baz' => 'bat', missing so should be null
+            ],
+        ];
+        $this->store->addDoc('test', 'b', $docB);
+
+        $docC = [
+            'some' => [
+                'prop' => 'foo',
+                'other' => [
+                    //'nested' => 42, missing, so should be null
+                    'ignoredNested' => 'value'
+                ]
+            ],
+            'baz' => 'bat',
+        ];
+        $this->store->addDoc('test', 'c', $docC);
+
+        $partialSelect = new PartialSelect([
+            'some.alias' => 'some.prop', // Nested alias <- Nested field
+            'magicNumber' => 'some.other.nested', // Top level alias <- Nested Field
+            'baz', // Top level field
+        ]);
+
+        $docA = $this->store->getPartialDoc('test', $partialSelect, 'a');
+
+        $this->assertEquals([
+            'some' => [
+                'alias' => 'foo',
+            ],
+            'magicNumber' => 42,
+            'baz' => 'bat'
+        ], $docA);
+
+        $docD = $this->store->getPartialDoc('test', $partialSelect, 'd');
+
+        $this->assertNull($docD);
+    }
+
+    /**
+     * @test
+     */
     public function it_applies_merge_alias_for_nested_fields_if_specified()
     {
         $this->store->addCollection('test');
