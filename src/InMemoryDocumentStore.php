@@ -205,7 +205,7 @@ final class InMemoryDocumentStore implements DocumentStore
         $this->assertDocExists($collectionName, $docId);
         $this->assertUniqueConstraints($collectionName, $docId, $docOrSubset);
 
-        $this->inMemoryConnection['documents'][$collectionName][$docId] = $this->arrayReplaceRecursiveAssocOnly(
+        $this->inMemoryConnection['documents'][$collectionName][$docId] = $this->arrayReplace(
             $this->inMemoryConnection['documents'][$collectionName][$docId],
             $docOrSubset
         );
@@ -550,7 +550,7 @@ final class InMemoryDocumentStore implements DocumentStore
 
         if($this->hasDoc($collectionName, $docId)) {
             $effectedDoc = $this->getDoc($collectionName, $docId);
-            $docOrSubset = $this->arrayReplaceRecursiveAssocOnly($effectedDoc, $docOrSubset);
+            $docOrSubset = $this->arrayReplace($effectedDoc, $docOrSubset);
         }
 
         $reader = new ArrayReader($docOrSubset);
@@ -672,30 +672,13 @@ final class InMemoryDocumentStore implements DocumentStore
      * @param array $array2
      * @return array
      */
-    private function arrayReplaceRecursiveAssocOnly(array $array1, array $array2): array
+    private function arrayReplace(array $array1, array $array2): array
     {
         foreach ($array2 as $key2 => $value2) {
-            $bothValuesArraysAndAtLeastOneAssoc = \is_array($value2) &&
-                isset($array1[$key2]) && \is_array($array1[$key2]) &&
-                !($this->isSequentialArray($value2) && $this->isSequentialArray($array1[$key2]));
-
-            if ($bothValuesArraysAndAtLeastOneAssoc) {
-                $array1[$key2] = $this->arrayReplaceRecursiveAssocOnly($array1[$key2], $value2);
-            } else {
-                $array1[$key2] = $value2;
-            }
+            $array1[$key2] = $value2;
         }
 
         return $array1;
-    }
-
-    private function isSequentialArray(array $array): bool
-    {
-        if (\count($array) === 0) {
-            return true;
-        }
-
-        return \array_keys($array) === \range(0, \count($array) - 1);
     }
 
     private function transformToPartialDoc(array $doc, PartialSelect $partialSelect): array
