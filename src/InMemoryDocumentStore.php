@@ -250,6 +250,39 @@ final class InMemoryDocumentStore implements DocumentStore
     /**
      * @param string $collectionName
      * @param string $docId
+     * @param array  $doc
+     * @throws \THrowable if replacing did not succeed
+     */
+    public function replaceDoc(string $collectionName, string $docId, array $doc): void
+    {
+        $this->assertDocExists($collectionName, $docId);
+        $this->assertUniqueConstraints($collectionName, $docId, $doc);
+
+        $this->inMemoryConnection['documents'][$collectionName][$docId] = $doc;
+    }
+
+    /**
+     * @param string $collectionName
+     * @param Filter $filter
+     * @param array $set
+     * @throws \Throwable in case of connection error or other issues
+     */
+    public function replaceMany(string $collectionName, Filter $filter, array $set): void
+    {
+        $this->assertHasCollection($collectionName);
+
+        $docs = $this->inMemoryConnection['documents'][$collectionName];
+
+        foreach ($docs as $docId => $doc) {
+            if ($filter->match($doc, (string)$docId)) {
+                $this->replaceDoc($collectionName, (string)$docId, $set);
+            }
+        }
+    }
+
+    /**
+     * @param string $collectionName
+     * @param string $docId
      * @throws \Throwable if deleting did not succeed
      */
     public function deleteDoc(string $collectionName, string $docId): void

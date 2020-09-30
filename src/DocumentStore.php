@@ -105,6 +105,24 @@ interface DocumentStore
     /**
      * @param string $collectionName
      * @param string $docId
+     * @param array $doc
+     * @throws UnknownCollection
+     * @throws RuntimeException if updating did not succeed
+     */
+    public function replaceDoc(string $collectionName, string $docId, array $doc): void;
+
+    /**
+     * @param string $collectionName
+     * @param Filter $filter
+     * @param array $set
+     * @throws UnknownCollection
+     * @throws RuntimeException in case of connection error or other issues
+     */
+    public function replaceMany(string $collectionName, Filter $filter, array $set): void;
+
+    /**
+     * @param string $collectionName
+     * @param string $docId
      * @throws UnknownCollection
      * @throws RuntimeException if deleting did not succeed
      */

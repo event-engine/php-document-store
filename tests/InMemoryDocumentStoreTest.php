@@ -112,6 +112,36 @@ final class InMemoryDocumentStoreTest extends TestCase
     /**
      * @test
      */
+    public function it_replaces_a_doc()
+    {
+        $this->store->addCollection('test');
+
+        $doc = [
+            'some' => [
+                'prop' => 'foo',
+                'other' => [
+                    'nested' => 42
+                ]
+            ],
+            'baz' => 'bat',
+        ];
+
+        $this->store->addDoc('test', '1', $doc);
+
+        $doc = ['baz' => 'changed val'];
+
+        $this->store->replaceDoc('test', '1', $doc);
+
+        $filter = new EqFilter('baz', 'changed val');
+
+        $filteredDocs = $this->store->findDocs('test', $filter);
+
+        $this->assertCount(1, $filteredDocs);
+    }
+
+    /**
+     * @test
+     */
     public function it_retrieves_doc_ids_by_filter()
     {
         $this->store->addCollection('test');
@@ -546,6 +576,30 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->assertCount(2, $filteredDocs);
         $this->assertEquals('fuzz', $filteredDocs[0]['some']['prop']);
         $this->assertEquals('fuzz', $filteredDocs[1]['some']['prop']);
+    }
+
+    /**
+     * @test
+     */
+    public function it_replaces_many()
+    {
+        $this->store->addCollection('test');
+
+        $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
+
+        $this->store->replaceMany(
+            'test',
+            new EqFilter('some.other.prop', 'bat'),
+            ['some' => ['prop' => 'fuzz']]
+        );
+
+        $filteredDocs = array_values(iterator_to_array($this->store->findDocs('test', new EqFilter('some.prop', 'fuzz'))));
+
+        $this->assertCount(2, $filteredDocs);
+        $this->assertEquals(['some' => ['prop' => 'fuzz']], $filteredDocs[0]);
+        $this->assertEquals(['some' => ['prop' => 'fuzz']], $filteredDocs[1]);
     }
 
     /**
