@@ -92,9 +92,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $doc = [
             'some' => [
                 'prop' => 'foo',
-                'other' => [
-                    'nested' => 42
-                ]
+                'other' => 'bar',
             ],
             'baz' => 'bat',
         ];
@@ -108,7 +106,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         ]);
 
         $filteredDocs = array_values(iterator_to_array($this->store->findDocs('test', new EqFilter('some.prop', 'fuzz'))));
-        $this->assertEquals(42, $filteredDocs[0]['some']['other']['nested']);
+        $this->assertArrayNotHasKey('other', $filteredDocs[0]['some']);
     }
 
     /**
@@ -424,6 +422,7 @@ final class InMemoryDocumentStoreTest extends TestCase
 
         $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
+        $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
 
         $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
         $this->store->addDoc('test', '4', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
@@ -443,7 +442,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
 
         $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
-        $this->store->updateDoc('test', '2', ['some' => ['prop' => 'foo']]);
+        $this->store->updateDoc('test', '2', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
     }
 
     /**
@@ -574,7 +573,7 @@ final class InMemoryDocumentStoreTest extends TestCase
     /**
      * @test
      */
-    public function it_does_not_update_numeric_arrays_recursively()
+    public function it_does_not_update_arrays_recursively()
     {
         $this->store->addCollection('test');
 
@@ -604,13 +603,13 @@ final class InMemoryDocumentStoreTest extends TestCase
 
         $this->assertEquals(
             [
-                'a' => ['a' => 10, 'b' => 21, 'c' => 30],
+                'a' => ['b' => 21, 'c' => 30],
                 'b' => [10, 30],
                 'c' => [true],
                 'd' => [],
-                'e' => ['a' => 'b'],
-                'f' => [10, 20, 'x' => 10, 'y' => 20],
-                'g' => ['x' => 10, 'y' => 20, 30, 40],
+                'e' => [],
+                'f' => ['x' => 10, 'y' => 20],
+                'g' => [30, 40],
                 'h' => [11],
                 'i' => [22],
                 'j' => ['bar']
