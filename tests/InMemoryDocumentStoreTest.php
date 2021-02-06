@@ -24,7 +24,7 @@ final class InMemoryDocumentStoreTest extends TestCase
      */
     private $store;
 
-    protected function setUp()
+    protected function setUp(): void
     {
         parent::setUp();
         $this->store = new InMemoryDocumentStore(new InMemoryConnection());
@@ -410,7 +410,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo']]);
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar']]);
 
-        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->expectExceptionMessageMatches('/^Unique constraint violation/');
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'foo']]);
     }
 
@@ -424,7 +424,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '1', ['some' => ['prop' => 'foo']]);
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar']]);
 
-        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->expectExceptionMessageMatches('/^Unique constraint violation/');
         $this->store->updateDoc('test', '2', ['some' => ['prop' => 'foo']]);
     }
 
@@ -454,7 +454,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
 
-        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->expectExceptionMessageMatches('/^Unique constraint violation/');
         $this->store->addDoc('test', '4', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
     }
 
@@ -471,7 +471,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
 
-        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->expectExceptionMessageMatches('/^Unique constraint violation/');
         $this->store->updateDoc('test', '2', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
     }
 
@@ -501,7 +501,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'bar', 'other' => ['prop' => 'bat']]]);
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
 
-        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->expectExceptionMessageMatches('/^Unique constraint violation/');
         $uniqueIndex = FieldIndex::forField('some.prop', FieldIndex::SORT_ASC, true);
         $this->store->addCollectionIndex('test', $uniqueIndex);
     }
@@ -533,7 +533,7 @@ final class InMemoryDocumentStoreTest extends TestCase
         $this->store->addDoc('test', '2', ['some' => ['prop' => 'foo', 'other' => ['prop' => 'bat']]]);
         $this->store->addDoc('test', '3', ['some' => ['prop' => 'bar']]);
 
-        $this->expectExceptionMessageRegExp('/^Unique constraint violation/');
+        $this->expectExceptionMessageMatches('/^Unique constraint violation/');
         $uniqueIndex = MultiFieldIndex::forFields(['some.prop', 'some.other.prop'], true);
         $this->store->addCollectionIndex('test', $uniqueIndex);
     }
