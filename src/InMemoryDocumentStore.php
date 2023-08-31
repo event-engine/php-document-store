@@ -20,6 +20,7 @@ use EventEngine\DocumentStore\Filter\Filter;
 use EventEngine\DocumentStore\OrderBy\AndOrder;
 use EventEngine\DocumentStore\OrderBy\Asc;
 use EventEngine\DocumentStore\OrderBy\Desc;
+use EventEngine\DocumentStore\OrderBy\DocId;
 use EventEngine\DocumentStore\OrderBy\OrderBy;
 use EventEngine\Persistence\InMemoryConnection;
 use function array_key_exists;
@@ -644,6 +645,10 @@ final class InMemoryDocumentStore implements DocumentStore
         };
 
         $getField = function (array $doc, OrderBy $orderBy) {
+            if ($orderBy instanceof DocId) {
+                return $doc['docId'];
+            }
+
             if ($orderBy instanceof Asc || $orderBy instanceof Desc) {
                 $field = $orderBy->prop();
 
@@ -651,8 +656,9 @@ final class InMemoryDocumentStore implements DocumentStore
             }
 
             throw new \RuntimeException(\sprintf(
-                'Unable to get field from doc: %s. Given OrderBy is neither an instance of %s nor %s',
-                \json_encode($doc['doc']),
+                'Unable to get field from doc: %s. Given OrderBy is neither an instance of %s, %s nor %s',
+                \json_encode($doc),
+                DocId::class,
                 Asc::class,
                 Desc::class
             ));
