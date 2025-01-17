@@ -163,7 +163,7 @@ interface DocumentStore
      * @return \Traversable list of docs
      * @throws UnknownCollection
      */
-    public function filterDocs(string $collectionName, Filter $filter, int $skip = null, int $limit = null, OrderBy $orderBy = null): \Traversable;
+    public function filterDocs(string $collectionName, Filter $filter, ?int $skip = null, ?int $limit = null, ?OrderBy $orderBy = null): \Traversable;
 
     /**
      * @param string $collectionName
@@ -174,7 +174,7 @@ interface DocumentStore
      * @return \Traversable list of docs with key being the docId and value being the stored doc
      * @throws UnknownCollection
      */
-    public function findDocs(string $collectionName, Filter $filter, int $skip = null, int $limit = null, OrderBy $orderBy = null): \Traversable;
+    public function findDocs(string $collectionName, Filter $filter, ?int $skip = null, ?int $limit = null, ?OrderBy $orderBy = null): \Traversable;
 
     /**
      * @param string $collectionName
@@ -186,7 +186,7 @@ interface DocumentStore
      * @return \Traversable list of docs with key being the docId and value being the stored doc
      * @throws UnknownCollection
      */
-    public function findPartialDocs(string $collectionName, PartialSelect $partialSelect, Filter $filter, int $skip = null, int $limit = null, OrderBy $orderBy = null): \Traversable;
+    public function findPartialDocs(string $collectionName, PartialSelect $partialSelect, Filter $filter, ?int $skip = null, ?int $limit = null, ?OrderBy $orderBy = null): \Traversable;
 
     /**
      * @param string $collectionName

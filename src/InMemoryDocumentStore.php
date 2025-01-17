@@ -340,9 +340,9 @@ final class InMemoryDocumentStore implements DocumentStore
     public function filterDocs(
         string $collectionName,
         Filter $filter,
-        int $skip = null,
-        int $limit = null,
-        OrderBy $orderBy = null): \Traversable
+        ?int $skip = null,
+        ?int $limit = null,
+        ?OrderBy $orderBy = null): \Traversable
     {
         $this->assertHasCollection($collectionName);
 
@@ -381,9 +381,9 @@ final class InMemoryDocumentStore implements DocumentStore
     public function findDocs(
         string $collectionName,
         Filter $filter,
-        int $skip = null,
-        int $limit = null,
-        OrderBy $orderBy = null): \Traversable
+        ?int $skip = null,
+        ?int $limit = null,
+        ?OrderBy $orderBy = null): \Traversable
     {
         $this->assertHasCollection($collectionName);
 
@@ -429,9 +429,9 @@ final class InMemoryDocumentStore implements DocumentStore
         string $collectionName,
         PartialSelect $partialSelect,
         Filter $filter,
-        int $skip = null,
-        int $limit = null,
-        OrderBy $orderBy = null): \Traversable
+        ?int $skip = null,
+        ?int $limit = null,
+        ?OrderBy $orderBy = null): \Traversable
     {
         $this->assertHasCollection($collectionName);
 
@@ -542,7 +542,7 @@ final class InMemoryDocumentStore implements DocumentStore
         }
     }
 
-    private function assertUniqueFieldConstraint(string $collectionName, string $docId, array $docOrSubset, FieldIndex $index, string $errMsg = null): void
+    private function assertUniqueFieldConstraint(string $collectionName, string $docId, array $docOrSubset, FieldIndex $index, ?string $errMsg = null): void
     {
         if(!$index->unique()) {
             return;
@@ -575,7 +575,7 @@ final class InMemoryDocumentStore implements DocumentStore
         return;
     }
 
-    private function assertMultiFieldUniqueConstraint(string $collectionName, string $docId, array $docOrSubset, MultiFieldIndex $index, string $errMsg = null): void
+    private function assertMultiFieldUniqueConstraint(string $collectionName, string $docId, array $docOrSubset, MultiFieldIndex $index, ?string $errMsg = null): void
     {
         if(!$index->unique()) {
             return;
