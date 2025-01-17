@@ -62,7 +62,7 @@ final class FieldIndex implements Index
         string $field,
         int $sort,
         bool $unique,
-        string $name = null
+        ?string $name = null
     ) {
         if (\mb_strlen($field) === 0) {
             throw new \InvalidArgumentException('Field must not be empty');

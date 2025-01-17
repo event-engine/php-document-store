@@ -58,7 +58,7 @@ final class MultiFieldIndex implements Index
         );
     }
 
-    private function __construct(bool $unique,string $name = null, FieldIndex ...$fields)
+    private function __construct(bool $unique, ?string $name = null, FieldIndex ...$fields)
     {
         if (\count($fields) <= 1) {
             throw new \InvalidArgumentException('MultiFieldIndex should contain at least two fields');
